@@ -1,34 +1,11 @@
-print("ok")
 
-A=5
-set_m(10)
-assert get_m() == 10
-
-set_rom(20)
-assert get_rom() == 20
-
-def a_instr(v:int):
-    assert v <= 32767
-    binary_string = f"0{v:>015b}"
-    return int(binary_string,base=2)
+from instructions import c_instr, a_instr
+from memory import fetch, get_a, get_d, init_memory, set_a, set_d, set_m, set_pc, update_pc
 
 
-COMP = {
-    "D&A":"000000",
-    "1": "01111",
-    "0": "010101"
-}
+init_memory()
 
-DEST = {
-    None : (0,0,0),
-    "D": (0,1,0),
-}
 
-def c_instr(comp:str, dest:str=None, jmp:str = None):
-    assert comp in COMP.keys()
-    assert dest in DEST.keys()
-
-    return int(1,base=2)
 
 
 PROGRAM = [
@@ -36,19 +13,65 @@ c_instr("1",dest="D"),
 c_instr("1",dest="D")
 ]
 
-def load_program():
-    for i in range(RAM_SIZE):
-        ROM[i] = 0
 
-    for i in range(len(PROGRAM)):
-        ROM[i] = PROGRAM[i]
+def decode_execute_a_instruction(instruction:int):
+    set_a(instruction)
+    update_pc()
 
-load_program()
-print(ROM[:10])
+def assign(v:int ,dest:int):
+    dest_a = dest >> 2 & 0x1 == 1
+    dest_d = dest >> 1 & 0x1 == 1
+    dest_m = dest & 0x1 == 1
 
-def run():
-    while True:
-        instruction = ROM[pc]# fetch()
-        decode_execute(instruction)
+    print(f"assign {dest_a} {dest_d} {dest_m}    ")
 
-run()
+    if dest_a:
+        set_a(v)
+    if dest_d:
+        set_d(v)
+    if dest_m:
+        set_m(v)
+
+
+
+def decode_execute_c_instruction(instruction:int):
+    j = instruction & 0x7
+    d = instruction >> 3 & 0x7
+    c = instruction >> 6 & 0x7F
+
+    print(f"dest = {d}")
+
+    if d != 0:
+        
+        # dest = comp
+        match f"{c:>07b}":
+            case "0001100": 
+                value = get_d()
+                assign(value,d)
+                update_pc()
+            case "0011111":
+                value = get_d() +1
+                assign(value,d)
+                update_pc()
+            case "0111111":
+                assign(1,d)
+                update_pc()
+    
+    elif j !=0:
+        match f"{c:>07b}":
+            case "0101010": # unconditional jump
+                set_pc(get_a())
+
+def decode_execute(instruction:int):
+    is_a_instruction  = instruction >> 15 & 0x1 == 0
+    print(f"is a instruction? {is_a_instruction}")
+    if is_a_instruction:
+        decode_execute_a_instruction(instruction)
+    else:
+        decode_execute_c_instruction(instruction)
+
+def cycle():
+    instruction = fetch()# ROM[pc]# fetch()
+    print(f"instruction = {instruction:>016b}")
+    decode_execute(instruction)
+
